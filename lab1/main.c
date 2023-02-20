@@ -17,7 +17,8 @@ static void matrix_multiply(const double *a, const double *b, double *c,
 }
 
 enum Consts{
-    N = 1000
+    N = 500,
+    COUNT_OF_CYCLES = 1000000
 };
 
 static void heating(){
@@ -31,9 +32,11 @@ static void heating(){
 }
 
 extern double measure_latency(int32_t);
+extern double measure_throughput(int32_t);
 
 int main() {
     heating();
-    printf("%f\n", measure_latency(1000000));
+    printf("%f ", measure_latency(COUNT_OF_CYCLES));
+    printf("%f\n", measure_throughput(COUNT_OF_CYCLES));
     return 0;
 }
