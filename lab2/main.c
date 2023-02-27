@@ -8,29 +8,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 
 enum Consts {
-    N = 100000,
-    COUNT_OF_CYCLES = 10000,
+    N = 1000000,
+    COUNT_OF_CYCLES = 100000,
     HM = 500,
     CACHE_LINE_SIZE = 64
 };
 
+const int shift = CACHE_LINE_SIZE / sizeof(size_t);
 
 static void
 generate_random_single_cycle_permutation(size_t n, size_t *p) {
     srand(time(NULL));
 
     for (size_t i = 0; i < n; ++i) {
-        p[i] = i;
+        p[i*shift] = i;
     }
 
     for (size_t i = n - 1; i >= 1; --i) {
         size_t j = (size_t) rand() % i;
-        size_t k = p[i];
-        p[i] = p[j];
-        p[j] = k;
+        size_t k = p[i*shift];
+        p[i*shift] = p[j*shift];
+        p[j*shift] = k;
     }
 }
 
@@ -40,7 +42,6 @@ rdtsc() {
     uint64_t x;
     __asm__ volatile ("lfence\n\t"
                       "rdtsc\n\t"
-                      "lfence\n\t"
                       "shlq $32, %%rdx\n\t"
                       "orq %%rdx, %%rax" : "=a" (x) : : "%rdx");
     return x;
@@ -58,9 +59,10 @@ int summ(int a, int b) {
 }
 
 
-#define NOP_X_10() \
+#define NOP_X_10(count_of_ops_x10) \
 do{ \
     __asm__ __volatile__( \
+    "LOOP:"               \
     "nop\n\t" \
     "nop\n\t"\
     "nop\n\t" \
@@ -70,7 +72,8 @@ do{ \
     "nop\n\t"\
     "nop\n\t"\
     "nop\n\t"\
-    "nop\n\t"\
+    "nop\n\t" \
+    "jmp LLL\n\t"\
     :::);  \
 }while(0)
 
@@ -78,10 +81,16 @@ do{ \
 static double
 measure(const size_t *permutation, size_t *index, int cnt_of_cycles, int cnt_of_nop_x10) {
 
+    size_t k = 0;
+    for(int i=0; i<cnt_of_cycles; ++i){
+        k = permutation[k * shift];
+        //printf("%zu\n", k);
+    }
+
     size_t curr = *index;
     uint64_t s = rdtsc();
     for (int i = 0; i < cnt_of_cycles; ++i) {
-        curr = permutation[curr];
+        curr = permutation[curr * shift];
         for (int j = 0; j < cnt_of_nop_x10; ++j) {
             NOP_X_10();
         }
@@ -121,14 +130,17 @@ static void heating(){
 int main() {
     //heating();
 
-    size_t* permutation = malloc(sizeof(size_t) * N * CACHE_LINE_SIZE);
+    size_t* permutation = malloc(N * CACHE_LINE_SIZE);
     generate_random_single_cycle_permutation(N, permutation);
 
-    size_t start_index = N-1;
-    for(int i=0; i<50; ++i) {
+
+    //sleep(1);
+
+    for(int i=0; i<500; ++i) {
+        size_t start_index = rand() % N;
         //generate_random_single_cycle_permutation(N, permutation);
-        double res = measure(permutation, &start_index, 1, i);
-        printf("Cnt of nops: %d, read latency: %f\n", i*10, res);
+        double res = measure(permutation, &start_index, N*5, i);
+        printf("Cnt of nops: %d, read latency: %f     %zu\n", i*10, res, start_index);
     }
 
 
