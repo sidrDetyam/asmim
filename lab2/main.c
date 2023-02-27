@@ -37,7 +37,7 @@ generate_random_single_cycle_permutation(size_t n, size_t *p) {
 }
 
 
-uint64_t
+static uint64_t
 rdtsc() {
     uint64_t x;
     __asm__ volatile ("lfence\n\t"
@@ -62,7 +62,7 @@ int summ(int a, int b) {
 #define NOP_X_10(count_of_ops_x10) \
 do{ \
     __asm__ __volatile__( \
-    "LOOP:"               \
+    ".LOOP:"               \
     "nop\n\t" \
     "nop\n\t"\
     "nop\n\t" \
@@ -71,10 +71,9 @@ do{ \
     "nop\n\t"\
     "nop\n\t"\
     "nop\n\t"\
-    "nop\n\t"\
-    "nop\n\t" \
-    "jmp LLL\n\t"\
-    :::);  \
+    "subl $1, %%ecx\n\t"\
+    "jnz .LOOP\n\t"\
+    :: "c" (1) : );  \
 }while(0)
 
 
@@ -91,9 +90,25 @@ measure(const size_t *permutation, size_t *index, int cnt_of_cycles, int cnt_of_
     uint64_t s = rdtsc();
     for (int i = 0; i < cnt_of_cycles; ++i) {
         curr = permutation[curr * shift];
-        for (int j = 0; j < cnt_of_nop_x10; ++j) {
-            NOP_X_10();
-        }
+        //for (int j = 0; j < cnt_of_nop_x10; ++j) {
+            //NOP_X_10(cnt_of_nop_x10);
+        //}
+
+        __asm__ __volatile__(
+    //            "jz .NOP_LOOP_END\n\t"
+    ".NOP_LOOP_START:\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "subl $1, %%ecx\n\t"
+    "jnz .NOP_LOOP_START\n\t"
+    ".NOP_LOOP_END:\n\t"
+    :: "c" (cnt_of_nop_x10) : );
     }
     uint64_t f = rdtsc();
 
@@ -136,7 +151,7 @@ int main() {
 
     //sleep(1);
 
-    for(int i=0; i<500; ++i) {
+    for(int i=1; i<250; ++i) {
         size_t start_index = rand() % N;
         //generate_random_single_cycle_permutation(N, permutation);
         double res = measure(permutation, &start_index, N*5, i);
