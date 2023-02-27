@@ -11,6 +11,7 @@ measure_latency:
     cvtsi2sdl %edi, %xmm1
 
     lfence
+    movq $0, %rax
     rdtsc
     shlq $32, %rdx
     orq %rdx, %rax
@@ -29,6 +30,7 @@ measure_latency:
     jnz .loop
 
     lfence
+    movq $0, %rax
     rdtsc
     shlq $32, %rdx
     orq %rdx, %rax
