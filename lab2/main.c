@@ -8,31 +8,44 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
+
+
+#define ASSERT(cond__) \
+do{\
+    if(!(cond__)){ \
+        perror("something goes wrong..."); \
+        fprintf(stderr, #cond__);                   \
+        fprintf(stderr, "\n");  \
+        exit(1); \
+    } \
+}while(0)
 
 
 enum Consts {
-    N = 1000000,
-    COUNT_OF_CYCLES = 100000,
-    HM = 500,
-    CACHE_LINE_SIZE = 64
+    CACHE_MEMORY_SIZE = 300000000,
+    MAX_CACHE_LINE_SIZE = 64,
+    COUNT_OF_PASSES = 3,
+    MN_OPS_MULTIPLIER = 1,
+    MX_OPS_MULTIPLIER = 30
 };
 
-const int shift = CACHE_LINE_SIZE / sizeof(size_t);
+
+#define SHIFT(i) ((i) * MAX_CACHE_LINE_SIZE / sizeof(size_t))
+
 
 static void
 generate_random_single_cycle_permutation(size_t n, size_t *p) {
     srand(time(NULL));
 
     for (size_t i = 0; i < n; ++i) {
-        p[i*shift] = i;
+        p[SHIFT(i)] = i;
     }
 
     for (size_t i = n - 1; i >= 1; --i) {
         size_t j = (size_t) rand() % i;
-        size_t k = p[i*shift];
-        p[i*shift] = p[j*shift];
-        p[j*shift] = k;
+        size_t k = p[SHIFT(i)];
+        p[SHIFT(i)] = p[SHIFT(j)];
+        p[SHIFT(j)] = k;
     }
 }
 
@@ -48,116 +61,57 @@ rdtsc() {
 }
 
 
-int summ(int a, int b) {
-    int res;
-    __asm__ __volatile__("movl %1, %%eax\n\t"
-                         "addl %2, %%eax\n\t"
-                         "movl %%eax, %0\n\t"
-                         "movl $1, %%eax": "=r" (res) : "r" (a), "r" (b) : "%eax");
-
-    return res;
-}
-
-
-#define NOP_X_10(count_of_ops_x10) \
+#define OP_X_10(count_of_ops_x10) \
 do{ \
-    __asm__ __volatile__( \
-    ".LOOP:"               \
-    "nop\n\t" \
-    "nop\n\t"\
-    "nop\n\t" \
-    "nop\n\t"\
-    "nop\n\t"\
-    "nop\n\t"\
-    "nop\n\t"\
-    "nop\n\t"\
-    "subl $1, %%ecx\n\t"\
-    "jnz .LOOP\n\t"\
-    :: "c" (1) : );  \
+    __asm__ __volatile__(          \
+        ".NOP_LOOP_START:\n\t"\
+        "nop\n\t"\
+        "nop\n\t"\
+        "nop\n\t"\
+        "nop\n\t"\
+        "nop\n\t"\
+        "nop\n\t"\
+        "nop\n\t"\
+        "nop\n\t"\
+        "subl $1, %%ecx\n\t"\
+        "jnz .NOP_LOOP_START\n\t"\
+        ".NOP_LOOP_END:\n\t"\
+    :: "c" (cnt_of_ops_x10) :);\
 }while(0)
 
 
 static double
-measure(const size_t *permutation, size_t *index, int cnt_of_cycles, int cnt_of_nop_x10) {
+measure(const size_t *permutation, size_t perm_len, int cnt_of_ops_x10) {
 
-    size_t k = 0;
-    for(int i=0; i<cnt_of_cycles; ++i){
-        k = permutation[k * shift];
-        //printf("%zu\n", k);
+    for(size_t i=0, curr=0; i<perm_len; ++i){
+        curr = permutation[SHIFT(curr)];
     }
 
-    size_t curr = *index;
     uint64_t s = rdtsc();
-    for (int i = 0; i < cnt_of_cycles; ++i) {
-        curr = permutation[curr * shift];
-        //for (int j = 0; j < cnt_of_nop_x10; ++j) {
-            //NOP_X_10(cnt_of_nop_x10);
-        //}
-
-        __asm__ __volatile__(
-    //            "jz .NOP_LOOP_END\n\t"
-    ".NOP_LOOP_START:\n\t"
-    "nop\n\t"
-    "nop\n\t"
-    "nop\n\t"
-    "nop\n\t"
-    "nop\n\t"
-    "nop\n\t"
-    "nop\n\t"
-    "nop\n\t"
-    "subl $1, %%ecx\n\t"
-    "jnz .NOP_LOOP_START\n\t"
-    ".NOP_LOOP_END:\n\t"
-    :: "c" (cnt_of_nop_x10) : );
+    for (size_t i = 0, curr = rand() % perm_len; i < perm_len * COUNT_OF_PASSES; ++i) {
+        curr = permutation[SHIFT(curr)];
+        OP_X_10(cnt_of_ops_x10);
     }
     uint64_t f = rdtsc();
 
-    *index = curr;
-    return (double)(f-s) / cnt_of_cycles;
-}
-
-
-static void matrix_multiply(const double *a, const double *b, double *c,
-                            size_t n, size_t m, size_t p) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < p; j++) {
-            double sum = 0.0;
-            for (int k = 0; k < m; k++) {
-                sum += a[i * m + k] * b[k * p + j];
-            }
-            c[i * p + j] = sum;
-        }
-    }
-}
-
-
-static void heating(){
-    double* a = malloc(sizeof(double) * HM * HM);
-    double* b = malloc(sizeof(double) * HM * HM);
-    double* c = malloc(sizeof(double) * HM * HM);
-    matrix_multiply(a, b, c, HM, HM, HM);
-    free(a);
-    free(b);
-    free(c);
+    return (double)(f-s) / (double)(perm_len * COUNT_OF_PASSES);
 }
 
 
 int main() {
-    //heating();
+    const size_t perm_len = CACHE_MEMORY_SIZE / MAX_CACHE_LINE_SIZE;
+    size_t* permutation = malloc(perm_len * MAX_CACHE_LINE_SIZE);
+    ASSERT(permutation != NULL);
+    generate_random_single_cycle_permutation(perm_len, permutation);
 
-    size_t* permutation = malloc(N * CACHE_LINE_SIZE);
-    generate_random_single_cycle_permutation(N, permutation);
-
-
-    //sleep(1);
-
-    for(int i=1; i<250; ++i) {
-        size_t start_index = rand() % N;
-        //generate_random_single_cycle_permutation(N, permutation);
-        double res = measure(permutation, &start_index, N*5, i);
-        printf("Cnt of nops: %d, read latency: %f     %zu\n", i*10, res, start_index);
+    printf("Instructions per cache miss : avg cache miss time(clocks)\n"
+           "---------------------------------------------------------\n");
+    for(int i=MN_OPS_MULTIPLIER; i<MX_OPS_MULTIPLIER; ++i) {
+        double clocks = measure(permutation, perm_len, i);
+        printf("%27d : %f\n", i*10, clocks);
     }
 
+    free(permutation);
 
     return 0;
 }
