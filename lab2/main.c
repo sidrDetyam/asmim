@@ -24,9 +24,9 @@ do{\
 enum Consts {
     CACHE_MEMORY_SIZE = 300000000,
     MAX_CACHE_LINE_SIZE = 64,
-    COUNT_OF_PASSES = 3,
-    MN_OPS_MULTIPLIER = 1,
-    MX_OPS_MULTIPLIER = 30
+    COUNT_OF_PASSES = 2,
+    BRUH = 10000,
+    TESTS = 5
 };
 
 
@@ -61,55 +61,42 @@ rdtsc() {
 }
 
 
-#define OP_X_10(count_of_ops_x10) \
-do{ \
-    __asm__ __volatile__(          \
-        ".NOP_LOOP_START:\n\t"\
-        "nop\n\t"\
-        "nop\n\t"\
-        "nop\n\t"\
-        "nop\n\t"\
-        "nop\n\t"\
-        "nop\n\t"\
-        "nop\n\t"\
-        "nop\n\t"\
-        "subl $1, %%ecx\n\t"\
-        "jnz .NOP_LOOP_START\n\t"\
-        ".NOP_LOOP_END:\n\t"\
-    :: "c" (cnt_of_ops_x10) :);\
-}while(0)
+extern size_t foo(const size_t*, size_t, size_t);
 
 
 static double
-measure(const size_t *permutation, size_t perm_len, int cnt_of_ops_x10) {
-
-    for(size_t i=0, curr=0; i<perm_len; ++i){
-        curr = permutation[SHIFT(curr)];
-    }
+measure(const size_t *permutation, size_t perm_len) {
 
     uint64_t s = rdtsc();
-    for (size_t i = 0, curr = rand() % perm_len; i < perm_len * COUNT_OF_PASSES; ++i) {
-        curr = permutation[SHIFT(curr)];
-        OP_X_10(cnt_of_ops_x10);
-    }
+    foo(permutation, rand() % perm_len, perm_len * COUNT_OF_PASSES);
     uint64_t f = rdtsc();
 
-    return (double)(f-s) / (double)(perm_len * COUNT_OF_PASSES);
+    return (double) (f - s) / (double) (perm_len * COUNT_OF_PASSES);
 }
 
 
-int main() {
+#define MIN(a, b) ((a)<(b)? (a) : (b))
+
+
+int main(int argc, char** argv) {
     const size_t perm_len = CACHE_MEMORY_SIZE / MAX_CACHE_LINE_SIZE;
-    size_t* permutation = malloc(perm_len * MAX_CACHE_LINE_SIZE);
+    size_t *permutation = malloc(perm_len * MAX_CACHE_LINE_SIZE);
     ASSERT(permutation != NULL);
     generate_random_single_cycle_permutation(perm_len, permutation);
 
-    printf("Instructions per cache miss : avg cache miss time(clocks)\n"
-           "---------------------------------------------------------\n");
-    for(int i=MN_OPS_MULTIPLIER; i<MX_OPS_MULTIPLIER; ++i) {
-        double clocks = measure(permutation, perm_len, i);
-        printf("%27d : %f\n", i*10, clocks);
+//    printf("Nops per cache miss : avg cache miss time(clocks)\n"
+//           "---------------------------------------------------------\n");
+
+    size_t curr = 0;
+    for (size_t i = 0; i < perm_len * 2; ++i) {
+        curr = permutation[SHIFT(curr)];
     }
+
+    double clocks = 1e10;
+    for (int i = 0; i < TESTS; ++i) {
+        clocks = MIN(measure(permutation, perm_len), clocks);
+    }
+    printf("%27d : %f", atoi(argv[1]), clocks);
 
     free(permutation);
 
