@@ -1,0 +1,67 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <papi.h>
+#include <x86intrin.h>
+
+#define CHECK(x, code)\
+do{                     \
+    if (x != code) {\
+        std::cerr << #x " : PAPI error " << x << " : " << PAPI_strerror(x) << std::endl;\
+        exit(1);\
+    }                    \
+}while(0)
+
+#define ASSERT(cond__) \
+do{\
+    if(!(cond__)){     \
+        std::cerr << #cond__ << std::endl;               \
+        exit(1); \
+    } \
+}while(0)
+
+
+namespace {
+
+    constexpr int COUNT_OF_CYCLES = 100000;
+
+    void heating() {
+        constexpr size_t n = 100;
+        std::vector<double> a(n*n), b(n*n), c(n*n);
+
+        for (size_t i = 0; i < n; i++) {
+            for (size_t j = 0; j < n; j++) {
+                double sum = 0.0;
+                for (size_t k = 0; k < n; k++) {
+                    sum += a[i * n + k] * b[k * n + j];
+                }
+                c[i * n + j] = sum;
+            }
+        }
+    }
+}
+
+int main(const int argc, const char *const *const argv) {
+    ASSERT(argc == 2);
+    const int k = std::stoi(argv[1]);
+    ASSERT(2 < k && k < 200);
+
+    const std::vector<int> event_codes = {PAPI_TOT_CYC, PAPI_BR_CN, PAPI_BR_MSP, PAPI_BR_PRC};
+    std::vector<long long> values(event_codes.size());
+    int event_set = PAPI_NULL;
+
+    CHECK(PAPI_library_init(PAPI_VER_CURRENT), PAPI_VER_CURRENT);
+    CHECK(PAPI_create_eventset(&event_set), PAPI_OK);
+    for (auto code: event_codes) {
+        CHECK(PAPI_add_event(event_set, code), PAPI_OK);
+    }
+
+    heating();
+    int unused;
+
+    CHECK(PAPI_start(event_set), PAPI_OK);
+
+    const long long start = _rdtsc();
+    for (int i = 0; i < COUNT_OF_CYCLES; i++) {
+
+        // dummy-brunches

@@ -1,0 +1,23 @@
+        //
+
+        if (i % k == 0 || (i - 1) % k == 0) {
+            unused = 0;
+        }
+    }
+    const long long finish = _rdtsc();
+
+    CHECK(PAPI_stop(event_set, values.data()), PAPI_OK);
+    CHECK(PAPI_reset(event_set), PAPI_OK);
+    CHECK(PAPI_cleanup_eventset(event_set), PAPI_OK);
+    CHECK(PAPI_destroy_eventset(&event_set), PAPI_OK);
+
+    std::cout << k << ",";
+    std::cout << static_cast<double>(finish - start) / COUNT_OF_CYCLES;
+
+    for (auto v: values) {
+        std::cout << "," << v;
+    }
+    std::cout << std::endl;
+
+    return 0;
+}
