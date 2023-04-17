@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.24)
-project(asmim C)
+project(asmim)
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_FLAGS  "-O0")
 
 add_executable(asmim
-        #lab1/main.c lab1/main.c
-        lab2/main.c)
+        lab3/lab3.cpp)
+
+target_link_libraries(asmim papi m)

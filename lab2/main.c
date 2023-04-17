@@ -25,7 +25,6 @@ enum Consts {
     CACHE_MEMORY_SIZE = 300000000,
     MAX_CACHE_LINE_SIZE = 64,
     COUNT_OF_PASSES = 2,
-    BRUH = 10000,
     TESTS = 5
 };
 
@@ -83,9 +82,6 @@ int main(int argc, char** argv) {
     size_t *permutation = malloc(perm_len * MAX_CACHE_LINE_SIZE);
     ASSERT(permutation != NULL);
     generate_random_single_cycle_permutation(perm_len, permutation);
-
-//    printf("Nops per cache miss : avg cache miss time(clocks)\n"
-//           "---------------------------------------------------------\n");
 
     size_t curr = 0;
     for (size_t i = 0; i < perm_len * 2; ++i) {
