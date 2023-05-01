@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <vector>
 #include <string>
@@ -44,7 +45,7 @@ namespace {
 int main(const int argc, const char *const *const argv) {
     ASSERT(argc == 2);
     const int k = std::stoi(argv[1]);
-    ASSERT(2 < k && k < 100);
+    ASSERT(2 < k && k < 200);
 
     const std::vector<int> event_codes = {PAPI_TOT_CYC, PAPI_BR_CN, PAPI_BR_MSP, PAPI_BR_PRC};
     std::vector<long long> values(event_codes.size());
@@ -57,19 +58,19 @@ int main(const int argc, const char *const *const argv) {
     }
 
     heating();
-    int a = 0;
+    int unused;
 
     CHECK(PAPI_start(event_set), PAPI_OK);
 
     const long long start = _rdtsc();
     for (int i = 0; i < COUNT_OF_CYCLES; i++) {
 
-        if (i < 0) {
-            a = 0;
-        }
+        // dummy-brunches
+        if(i < -1){unused = -1;}
+        //
 
-        if (i % k == 0 || (i - 1) % k == 0) {
-            a = 1;
+        if (i % k == 0 || (i + 1) % k == 0) {
+            unused = 0;
         }
     }
     const long long finish = _rdtsc();
@@ -79,11 +80,13 @@ int main(const int argc, const char *const *const argv) {
     CHECK(PAPI_cleanup_eventset(event_set), PAPI_OK);
     CHECK(PAPI_destroy_eventset(&event_set), PAPI_OK);
 
+    std::cout << k << ",";
     std::cout << static_cast<double>(finish - start) / COUNT_OF_CYCLES;
 
     for (auto v: values) {
         std::cout << "," << v;
     }
+    std::cout << std::endl;
 
     return 0;
 }
