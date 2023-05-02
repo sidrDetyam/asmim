@@ -2,12 +2,12 @@
 // Created by sidr on 02.05.23.
 //
 
+#define _GNU_SOURCE
+
 #include <stdlib.h>
-#include <x86gprintrin.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <immintrin.h>
 #include <string.h>
+#include <sched.h>
+#include <spawn.h>
 #include "stdio.h"
 #include "utils.h"
 #include "pthread.h"
@@ -19,11 +19,15 @@ enum Consts{
 };
 
 
+typedef ull(*operation_t)(char*, char*, size_t);
+
+
 struct Context{
     pthread_barrier_t *barrier;
     ull res;
+    int cpu_id;
     size_t data_size;
-    ull(*operation)(char*, char*, size_t);
+    operation_t operation;
 };
 typedef struct Context context_t;
 
@@ -43,16 +47,22 @@ copy_operation(char* a, char* b, size_t cnt){
     return test_copy(a, b, cnt);
 }
 
+
 static void *
 subroutine(void * const arg) {
     context_t* const context = (context_t*) arg;
+
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(context->cpu_id, &cpuset);
+    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
 
     char * a = aligned_alloc(ALIGNMENT, context->data_size);
     char * b = aligned_alloc(ALIGNMENT, context->data_size);
     memset(a, 't', context->data_size);
     memset(b, 't', context->data_size);
 
-    //pthread_barrier_wait(context->barrier);
+    pthread_barrier_wait(context->barrier);
     context->operation(a, b, context->data_size);
     context->res = context->operation(a, b, context->data_size);
     context->operation(a, b, context->data_size);
@@ -62,37 +72,59 @@ subroutine(void * const arg) {
     return NULL;
 }
 
+static void
+test_operation(const char* const description,
+               const operation_t operation,
+               const size_t data_size,
+               const size_t t_count,
+               const double freq){
+
+    printf("  %s ", description);
+
+    pthread_t* const threads = malloc(sizeof(pthread_t) * t_count);
+    context_t* const contexts = malloc(sizeof(context_t) * t_count);
+    ASSERT(threads && contexts);
+    pthread_barrier_t barrier;
+
+    ASSERT(pthread_barrier_init(&barrier, NULL, t_count) == 0);
+    for(size_t i=0; i<t_count; ++i){
+        contexts[i].data_size = data_size;
+        contexts[i].operation = operation;
+        contexts[i].barrier = &barrier;
+        contexts[i].cpu_id = (int)i;
+
+        ASSERT(pthread_create(threads+i, NULL, subroutine, contexts+i)==0);
+    }
+
+    ull total_clocks = 0;
+    for(size_t i=0; i<t_count; ++i){
+        ASSERT(pthread_join(threads[i], NULL) == 0);
+        total_clocks += contexts[i].res;
+    }
+
+    free(threads);
+    free(contexts);
+
+    printf("%f;", (double)(t_count * data_size) / ((double)total_clocks / freq));
+}
+
 
 const static size_t data_size = 1<<27;
 
 
 int main(const int argc, const char * const * argv){
+    ASSERT(argc == 3);
+
 
     heating();
-////    system("cat /proc/cpuinfo | grep Hz");
-//
-////    FILE* devNull = fopen("/dev/null", "w+");
-//
-//    int devnull = open("/dev/null", O_WRONLY);
-//
-//    size_t cnt = 1<<27;
-//    char * a = aligned_alloc(32, cnt);
-//    char * b = aligned_alloc(32, cnt);
-////    for(int i=0; i<cnt; ++i){
-////        b[i] = (data_type) (rand() % 30);
-////    }
+//    system("cat /proc/cpuinfo | grep Hz");
+    size_t count = 2;
+    double freq = 1.6;
 
-    context_t context;
-    //pthread_barrier_init(context.barrier, NULL, 1);
-    context.operation = copy_operation;
-    context.data_size = data_size;
-
-    subroutine(&context);
-
-
-    ull res = context.res;
-    printf("%f\n", (double) data_size / ((double) res / 1600000000) / 1000000000.);
-//    ASSERT(write(devnull, a+cnt/2, 1)==1);
+    test_operation("copy", copy_operation, data_size, count, freq);
+    test_operation("read", read_operation, data_size, count, freq);
+    test_operation("write", write_operation, data_size, count, freq);
+    printf("\n");
 
     return 0;
 }

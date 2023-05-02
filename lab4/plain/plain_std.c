@@ -6,7 +6,8 @@
 #include <string.h>
 #include "plain.h"
 
-ull measure_copy_std(char* const dst, const char * const src, const size_t cnt){
+ull
+measure_copy_std(char* const dst, const char * const src, const size_t cnt){
     unsigned int _;
     const ull start = __rdtscp(&_);
 
@@ -16,7 +17,8 @@ ull measure_copy_std(char* const dst, const char * const src, const size_t cnt){
     return finish - start;
 }
 
-ull measure_read_std(const char* const src, char** const sum, const size_t cnt){
+ull
+measure_read_std(const char* const src, char** const sum, const size_t cnt){
     unsigned int _;
     const ull start = __rdtscp(&_);
 
@@ -30,7 +32,8 @@ ull measure_read_std(const char* const src, char** const sum, const size_t cnt){
     return finish - start;
 }
 
-ull measure_write_std(char* const dst, const char val, const size_t cnt){
+ull
+measure_write_std(char* const dst, const char val, const size_t cnt){
     unsigned int _;
 
     const ull start = __rdtscp(&_);
