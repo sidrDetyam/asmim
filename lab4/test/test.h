@@ -5,7 +5,7 @@
 #ifndef ASMIM_TEST_H
 #define ASMIM_TEST_H
 
-#include "plain.h"
+#include "../plain/plain.h"
 
 ull test_copy(char* dst, const char* src, size_t cnt);
 

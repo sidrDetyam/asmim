@@ -5,7 +5,7 @@
 #ifndef ASMIM_PLAIN_H
 #define ASMIM_PLAIN_H
 
-#include "utils.h"
+#include "../utils.h"
 
 typedef int data_type;
 
