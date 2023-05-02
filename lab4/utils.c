@@ -18,7 +18,7 @@ void matrix_multiply(const double * const a, const double * const b, double * co
 }
 
 enum Consts {
-    N = 500
+    N = 700
 };
 
 void heating() {

@@ -15,7 +15,7 @@
 
 
 enum Consts{
-    ALIGNMENT = 64
+    ALIGNMENT = 1024
 };
 
 
@@ -72,10 +72,12 @@ subroutine(void * const arg) {
     return NULL;
 }
 
+
+const static size_t data_size = 1<<27;
+
 static void
 test_operation(const char* const description,
                const operation_t operation,
-               const size_t data_size,
                const size_t t_count,
                const double freq){
 
@@ -109,22 +111,20 @@ test_operation(const char* const description,
 }
 
 
-const static size_t data_size = 1<<27;
-
-
 int main(const int argc, const char * const * argv){
     ASSERT(argc == 3);
 
+    char* endptr;
+    const long t_cnt = strtol(argv[1], &endptr, 10);
+    const double freq = strtod(argv[2], &endptr);
 
     heating();
 //    system("cat /proc/cpuinfo | grep Hz");
-    size_t count = 2;
-    double freq = 1.6;
 
-    test_operation("copy", copy_operation, data_size, count, freq);
-    test_operation("read", read_operation, data_size, count, freq);
-    test_operation("write", write_operation, data_size, count, freq);
-    printf("\n");
+    test_operation("copy", copy_operation, t_cnt, freq);
+    test_operation("read", read_operation, t_cnt, freq);
+    test_operation("write", write_operation, t_cnt, freq);
+//    printf("\n");
 
     return 0;
 }
